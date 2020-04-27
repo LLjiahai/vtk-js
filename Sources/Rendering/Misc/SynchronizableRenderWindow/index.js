@@ -144,7 +144,7 @@ function createInstanceMap() {
 function getSynchronizerContext(name = 'default') {
   let ctx = SYNCHRONIZER_CONTEXTS[name];
   if (!ctx) {
-    ctx = Object.assign({}, createArrayHandler(), createInstanceMap());
+    ctx = { ...createArrayHandler(), ...createInstanceMap() };
     SYNCHRONIZER_CONTEXTS[name] = ctx;
   }
   return ctx;
@@ -215,12 +215,11 @@ function createSceneMtimeHandler() {
 function createSyncFunction(renderWindow, synchronizerContext) {
   const progressHandler = createProgressHandler(renderWindow.render);
   const mtimeHandler = createSceneMtimeHandler();
-  const context = Object.assign(
-    {},
-    synchronizerContext,
-    progressHandler,
-    mtimeHandler
-  );
+  const context = {
+    ...synchronizerContext,
+    ...progressHandler,
+    ...mtimeHandler,
+  };
   let lastMtime = -1;
   let gcThreshold = 100;
 
