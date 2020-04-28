@@ -83,7 +83,10 @@ test.onlyIfWebGL(
             'Rendering/OpenGL/VolumeMapper/testCompositeParallelProjection',
             t,
             1.5,
-            gc.releaseResources
+            () => {
+              gc.releaseResources();
+              t.end();
+            }
           );
         });
         renderWindow.render();
