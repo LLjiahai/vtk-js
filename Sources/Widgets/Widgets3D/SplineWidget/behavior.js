@@ -5,31 +5,10 @@ export default function widgetBehavior(publicAPI, model) {
   model.classHierarchy.push('vtkSplineWidgetProp');
 
   // --------------------------------------------------------------------------
-  // Display 2D
+  // Private methods
   // --------------------------------------------------------------------------
 
-  publicAPI.setDisplayCallback = (callback) =>
-    model.representations[0].setDisplayCallback(callback);
-
-  // --------------------------------------------------------------------------
-  // Public methods
-  // --------------------------------------------------------------------------
-
-  publicAPI.getPoints = () =>
-    model.representations[1]
-      .getOutputData()
-      .getPoints()
-      .getData();
-
-  // --------------------------------------------------------------------------
-
-  publicAPI.sethandleSizeInPixels = (handleSizeInPixels) => {
-    model.handleSizeInPixels = handleSizeInPixels;
-  };
-
-  // --------------------------------------------------------------------------
-
-  publicAPI.updateHandlesSize = () => {
+  const updateHandlesSize = () => {
     if (model.handleSizeInPixels !== null) {
       const scale =
         model.handleSizeInPixels *
@@ -47,24 +26,7 @@ export default function widgetBehavior(publicAPI, model) {
 
   // --------------------------------------------------------------------------
 
-  publicAPI.reset = () => {
-    model.widgetState.clearHandleList();
-
-    model.lastHandle = null;
-    model.firstHandle = null;
-  };
-
-  // --------------------------------------------------------------------------
-
-  publicAPI.setFreehandMinDistance = (distance) => {
-    model.freehandMinDistance = distance;
-  };
-
-  // --------------------------------------------------------------------------
-  // Private methods
-  // --------------------------------------------------------------------------
-
-  publicAPI.addPoint = () => {
+  const addPoint = () => {
     // Commit handle to location
     if (
       !model.lastHandle ||
@@ -91,22 +53,7 @@ export default function widgetBehavior(publicAPI, model) {
 
   // --------------------------------------------------------------------------
 
-  publicAPI.updateResolution = () => {
-    if (
-      (model.keysDown[model.renderPoly.key] &&
-        model.renderPoly.status === 'down') ||
-      (!model.keysDown[model.renderPoly.key] &&
-        model.renderPoly.status === 'up')
-    ) {
-      model.representations[1].setResolution(1);
-    } else {
-      model.representations[1].setResolution(model.resolution);
-    }
-  };
-
-  // --------------------------------------------------------------------------
-
-  publicAPI.getHoveredHandle = () => {
+  const getHoveredHandle = () => {
     const handles = model.widgetState.getHandleList();
 
     return handles.reduce(
@@ -137,6 +84,61 @@ export default function widgetBehavior(publicAPI, model) {
   };
 
   // --------------------------------------------------------------------------
+  // Display 2D
+  // --------------------------------------------------------------------------
+
+  publicAPI.setDisplayCallback = (callback) =>
+    model.representations[0].setDisplayCallback(callback);
+
+  // --------------------------------------------------------------------------
+  // Public methods
+  // --------------------------------------------------------------------------
+
+  macro.setGet(publicAPI, model, [
+    'freehandMinDistance',
+    'allowFreehand',
+    'resetAfterEnter',
+    'resolution',
+    'defaultCursor',
+    'handleSizeInPixels',
+  ]);
+
+  // --------------------------------------------------------------------------
+
+  const superSetHandleSizeInPixels = publicAPI.setHandleSizeInPixels;
+  publicAPI.setHandleSizeInPixels = (size) => {
+    superSetHandleSizeInPixels(size);
+    updateHandlesSize();
+  };
+  publicAPI.setHandleSizeInPixels(model.handleSizeInPixels); // set initial value
+
+  // --------------------------------------------------------------------------
+
+  const superSetResolution = publicAPI.setResolution;
+  publicAPI.setResolution = (resolution) => {
+    superSetResolution(resolution);
+    model.representations[1].setResolution(model.resolution);
+  };
+  publicAPI.setResolution(model.resolution); // set initial value
+
+  // --------------------------------------------------------------------------
+
+  publicAPI.getPoints = () =>
+    model.representations[1]
+      .getOutputData()
+      .getPoints()
+      .getData();
+
+  // --------------------------------------------------------------------------
+
+  publicAPI.reset = () => {
+    model.widgetState.clearHandleList();
+
+    model.lastHandle = null;
+    model.firstHandle = null;
+  };
+
+  // --------------------------------------------------------------------------
   // Right click: Delete handle
   // --------------------------------------------------------------------------
 
@@ -156,7 +158,7 @@ export default function widgetBehavior(publicAPI, model) {
       model.activeState = null;
       model.interactor.cancelAnimation(publicAPI);
     } else {
-      const handle = publicAPI.getHoveredHandle();
+      const handle = getHoveredHandle();
       if (handle) {
         model.widgetState.removeHandle(handle);
       } else if (model.lastHandle) {
@@ -187,9 +189,9 @@ export default function widgetBehavior(publicAPI, model) {
     if (model.activeState === model.moveHandle) {
       if (model.widgetState.getHandleList().length === 0) {
         publicAPI.invokeStartInteractionEvent();
-        publicAPI.addPoint();
+        addPoint();
       } else {
-        const hoveredHandle = publicAPI.getHoveredHandle();
+        const hoveredHandle = getHoveredHandle();
         if (hoveredHandle && !model.keysDown.Control) {
           model.moveHandle.deactivate();
           model.moveHandle.setVisible(false);
@@ -198,7 +200,7 @@ export default function widgetBehavior(publicAPI, model) {
           model.isDragging = true;
           model.lastHandle.setVisible(true);
         } else {
-          publicAPI.addPoint();
+          addPoint();
         }
       }
 
@@ -288,7 +290,7 @@ export default function widgetBehavior(publicAPI, model) {
       model.openGLRenderWindow
     );
 
-    const hoveredHandle = publicAPI.getHoveredHandle();
+    const hoveredHandle = getHoveredHandle();
     if (hoveredHandle) {
       model.moveHandle.setVisible(false);
       model.openGLRenderWindow.setCursor('grabbing');
@@ -307,7 +309,7 @@ export default function widgetBehavior(publicAPI, model) {
         model.draggedPoint = true;
       }
       if (model.freeHand && model.activeState === model.moveHandle) {
-        publicAPI.addPoint();
+        addPoint();
       }
     }
 
@@ -320,24 +322,27 @@ export default function widgetBehavior(publicAPI, model) {
 
   publicAPI.handleKeyDown = ({ key }) => {
     model.keysDown[key] = true;
-    publicAPI.updateResolution();
+
+    if (!model.hasFocus) {
+      return;
+    }
 
     if (key === 'Enter') {
       if (model.widgetState.getHandleList().length > 0) {
-        publicAPI.invokeEndInteractionEvent();
-        model.interactor.render();
-      }
-    } else if (model.hasFocus) {
-      if (key === 'Escape') {
-        publicAPI.reset();
-        publicAPI.loseFocus();
-      } else if (key === 'Delete' || key === 'Backspace') {
-        if (model.lastHandle) {
-          model.widgetState.removeHandle(model.lastHandle);
-
-          const handleList = model.widgetState.getHandleList();
-          model.lastHandle = handleList[handleList.length - 1];
+        if (model.resetAfterEnter) {
+          publicAPI.reset();
         }
+        publicAPI.loseFocus();
+      }
+    } else if (key === 'Escape') {
+      publicAPI.reset();
+      publicAPI.loseFocus();
+    } else if (key === 'Delete' || key === 'Backspace') {
+      if (model.lastHandle) {
+        model.widgetState.removeHandle(model.lastHandle);
+
+        const handleList = model.widgetState.getHandleList();
+        model.lastHandle = handleList[handleList.length - 1];
       }
     }
   };
@@ -346,7 +351,6 @@ export default function widgetBehavior(publicAPI, model) {
 
   publicAPI.handleKeyUp = ({ key }) => {
     model.keysDown[key] = false;
-    publicAPI.updateResolution();
   };
 
   // --------------------------------------------------------------------------
@@ -355,12 +359,12 @@ export default function widgetBehavior(publicAPI, model) {
 
   publicAPI.grabFocus = () => {
     if (!model.hasFocus) {
-      model.moveHandle.activate();
-      model.moveHandle.setVisible(true);
       model.activeState = model.moveHandle;
+      model.activeState.activate();
+      model.activeState.setVisible(true);
       model.interactor.requestAnimation(publicAPI);
-      publicAPI.updateResolution();
-      publicAPI.updateHandlesSize();
+      publicAPI.invokeStartInteractionEvent();
+      updateHandlesSize();
     }
 
     model.hasFocus = true;
@@ -371,6 +375,7 @@ export default function widgetBehavior(publicAPI, model) {
   publicAPI.loseFocus = () => {
     if (model.hasFocus) {
       model.interactor.cancelAnimation(publicAPI);
+      publicAPI.invokeEndInteractionEvent();
     }
 
     model.widgetState.deactivate();

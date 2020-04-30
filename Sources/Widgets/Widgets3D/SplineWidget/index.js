@@ -57,6 +57,7 @@ const DEFAULT_VALUES = {
   keysDown: {},
   freehandMinDistance: 0.1,
   allowFreehand: true,
+  resetAfterEnter: false,
   resolution: 32,
   renderPoly: {
     key: 'Shift',
@@ -76,6 +77,7 @@ export function extend(publicAPI, model, initialValues = {}) {
     'manipulator',
     'freehandMinDistance',
     'allowFreehand',
+    'resetAfterEnter',
     'resolution',
     'defaultCursor',
     'handleSizeInPixels',
