@@ -30,7 +30,6 @@ export default function widgetBehavior(publicAPI, model) {
     // Commit handle to location
     if (
       !model.lastHandle ||
-      model.keysDown.Control ||
       !model.freeHand ||
       vec3.squaredDistance(
         model.moveHandle.getOrigin(),
@@ -45,6 +44,7 @@ export default function widgetBehavior(publicAPI, model) {
 
       if (!model.firstHandle) {
         model.firstHandle = model.lastHandle;
+        publicAPI.invokeStartInteractionEvent();
       }
 
       model.openGLRenderWindow.setCursor('grabbing');
@@ -186,26 +186,31 @@ export default function widgetBehavior(publicAPI, model) {
       return macro.VOID;
     }
 
+    // If in placing mode ... (hasFocus)
     if (model.activeState === model.moveHandle) {
-      if (model.widgetState.getHandleList().length === 0) {
-        publicAPI.invokeStartInteractionEvent();
-        addPoint();
-      } else {
-        const hoveredHandle = getHoveredHandle();
-        if (hoveredHandle && !model.keysDown.Control) {
+      // ... check if above an existing handle.
+      const hoveredHandle = getHoveredHandle();
+      if (hoveredHandle) {
+        if (hoveredHandle === model.firstHandle) {
+          // If initial handle, end spline
+          publicAPI.loseFocus();
+        } else {
+          // If other handle, deactivate placing ...
           model.moveHandle.deactivate();
           model.moveHandle.setVisible(false);
+          // ... and activate dragging it
           model.activeState = hoveredHandle;
           hoveredHandle.activate();
           model.isDragging = true;
-          model.lastHandle.setVisible(true);
-        } else {
-          addPoint();
         }
+      } else {
+        // If no handle hovered, add a new point
+        addPoint();
       }
 
       model.freeHand = model.allowFreehand && !model.isDragging;
     } else {
+      // If not in placing mode, active state is an hovered handle
       model.isDragging = true;
       model.openGLRenderWindow.setCursor('grabbing');
       model.interactor.requestAnimation(publicAPI);
@@ -293,7 +298,9 @@ export default function widgetBehavior(publicAPI, model) {
     const hoveredHandle = getHoveredHandle();
     if (hoveredHandle) {
       model.moveHandle.setVisible(false);
-      model.openGLRenderWindow.setCursor('grabbing');
+      if (hoveredHandle !== model.firstHandle) {
+        model.openGLRenderWindow.setCursor('grabbing');
+      }
     } else if (!model.isDragging && model.hasFocus) {
       model.moveHandle.setVisible(true);
       model.openGLRenderWindow.setCursor(model.defaultCursor);
